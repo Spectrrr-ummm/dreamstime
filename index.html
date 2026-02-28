@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hour Discipline V-5</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --empty: #1a1a1a;
+            --medium: #333333; 
+            --locked: #050505;
+            --accent: #ffffff;
+            --glow: rgba(255, 255, 255, 0.4);
+        }
+
+        * { box-sizing: border-box; touch-action: manipulation; }
+
+        body {
+            background: var(--bg);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: #000;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent), 0 0 20px var(--glow);
+            transition: width 0.6s ease;
+        }
+
+        .main-content {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header { margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-start; }
+        
+        h2 { 
+            font-size: 2.2rem; 
+            margin: 0; 
+            font-weight: 800; 
+            letter-spacing: -1px; 
+            color: var(--accent); 
+            text-shadow: 0 0 10px var(--glow);
+        }
+        p { color: #555; margin: 5px 0 0 0; font-size: 0.9rem; font-weight: 500; }
+
+        /* THE NOTE ICON - TOP RIGHT */
+        .note-toggle {
+            width: 32px;
+            height: 32px;
+            border: 1.5px solid var(--accent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 8px var(--glow);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .note-toggle:active { transform: scale(0.9); }
+        .note-toggle::after {
+            content: '';
+            width: 14px;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 2px 0 var(--accent), 0 -2px 0 var(--accent);
+        }
+
+        /* FLOATING NOTE SCREEN */
+        #note-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 2000;
+            padding: 40px 25px;
+            flex-direction: column;
+        }
+
+        #note-textarea {
+            width: 100%;
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            line-height: 1.6;
+        }
+
+        .note-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .close-note-btn {
+            background: var(--accent);
+            color: black;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px var(--glow);
+        }
+
+        /* REST OF EXISTING UI */
+        .streak-badge {
+            font-size: 0.7rem;
+            background: #1a1a1a;
+            padding: 6px 12px;
+            border-radius: 8px;
+            color: #777;
+            font-weight: 700;
+            border: 1px solid #222;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        #day-nav {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .nav-btn {
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 0.85rem;
+        }
+        
+        #viewing-label { font-size: 0.9rem; font-weight: 700; color: #fff; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 12px;
+            width: 100%;
+            flex-grow: 1;
+            margin-bottom: 90px;
+        }
+
+        .hour-box {
+            background: var(--empty);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            user-select: none;
+            border: 1px solid #222;
+        }
+
+        .hour-box.dark { background: var(--accent); color: #000; border: none; box-shadow: 0 0 15px var(--glow); }
+        /* Hold - Light/Transparent version of the theme color */
+.hour-box.medium { 
+    background: rgba(255, 255, 255, 0.15); 
+    color: var(--accent); 
+    border: 1px solid var(--accent); 
+}
+
+        .hour-box.future { border: 1px dashed #1a1a1a; color: #1a1a1a; opacity: 0.5; }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid #1a1a1a;
+            padding: 0 20px;
+            z-index: 100;
+        }
+
+        .nav-item {
+            color: #444;
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 1px;
+            flex: 1;
+        }
+
+        .nav-item.active { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
+
+        .theme-cycle-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            background: transparent;
+            display: none; 
+            box-shadow: 0 0 8px var(--glow);
+            position: absolute;
+            right: 30px;
+        }
+    </style>
+</head>
+<body onload="initTheme()">
+
+    <div id="note-overlay">
+        <h3 id="note-date-title" style="color:var(--accent); margin:0 0 20px 0;">Notes</h3>
+        <textarea id="note-textarea" placeholder="What's on your mind?"></textarea>
+        <div class="note-footer">
+            <span id="note-char-count" style="color:#444; font-size:0.8rem;">Saved Automatically</span>
+            <button class="close-note-btn" onclick="toggleNote(false)">Close</button>
+        </div>
+    </div>
+
+    <div class="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h2 id="display-date">Today</h2>
+                <p id="helper-text">Focus on the hour.</p>
+                <div id="streak-display" style="display:none;" class="streak-badge">
+                    STREAK: <b id="streak-count">0</b> DAYS
+                </div>
+            </div>
+            <div class="note-toggle" id="note-icon" onclick="toggleNote(true)"></div>
+        </div>
+
+        <div id="day-nav">
+            <button class="nav-btn" onclick="changeDay(-1)">← Older</button>
+            <span id="viewing-label">Viewing: Today</span>
+            <button class="nav-btn" id="next-btn" onclick="changeDay(1)">Newer →</button>
+        </div>
+
+        <div class="grid" id="hour-grid"></div>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-item active" id="tab-today" onclick="switchTab('today')">Track</div>
+        <div class="nav-item" id="tab-insights" onclick="switchTab('insights')">Insights</div>
+        <div class="theme-cycle-btn" id="theme-btn" onclick="cycleTheme()"></div>
+    </div>
+
+    <script>
+        const gridElement = document.getElementById('hour-grid');
+        const titleLabel = document.getElementById('display-date');
+        const viewLabel = document.getElementById('viewing-label');
+        const helperText = document.getElementById('helper-text');
+        const dayNav = document.getElementById('day-nav');
+        const progressBar = document.getElementById('progress-bar');
+        const streakDisplay = document.getElementById('streak-display');
+        const streakCountText = document.getElementById('streak-count');
+        const themeBtn = document.getElementById('theme-btn');
+        const noteOverlay = document.getElementById('note-overlay');
+        const noteTextarea = document.getElementById('note-textarea');
+        
+        let trackerData = JSON.parse(localStorage.getItem('discipline-data-v5')) || {};
+        let viewDate = new Date(); 
+        let isInsightsMode = false;
+
+        const themes = [
+    {c:'#ffffff', g:'rgba(255,255,255,0.4)', h:'rgba(255,255,255,0.15)'},
+    {c:'#ff3131', g:'rgba(255,49,49,0.4)',  h:'rgba(255,49,49,0.2)'},
+    {c:'#00f2ff', g:'rgba(0,242,255,0.4)',  h:'rgba(0,242,255,0.2)'},
+    {c:'#39ff14', g:'rgba(57,255,20,0.4)',  h:'rgba(57,255,20,0.2)'},
+    {c:'#ffbd00', g:'rgba(255,189,0,0.4)',  h:'rgba(255,189,0,0.2)'},
+    {c:'#bc13fe', g:'rgba(188,19,254,0.4)', h:'rgba(188,19,254,0.2)'}
+];
+
+        let currentThemeIdx = 0;
+
+        function cycleTheme() {
+    currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+    const t = themes[currentThemeIdx];
+    setTheme(t.c, t.g, t.h); 
+    localStorage.setItem('discipline-theme-idx', currentThemeIdx);
+}
+
+function setTheme(color, glow, hold) {
+    document.documentElement.style.setProperty('--accent', color);
+    document.documentElement.style.setProperty('--glow', glow);
+    document.documentElement.style.setProperty('--medium', hold); 
+}
+
+function initTheme() {
+    const savedIdx = localStorage.getItem('discipline-theme-idx');
+    if(savedIdx !== null) {
+        currentThemeIdx = parseInt(savedIdx);
+        const t = themes[currentThemeIdx];
+        setTheme(t.c, t.g, t.h);
+    }
+}
+
+        function getDateKey(date) {
+            const offset = date.getTimezoneOffset();
+            const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
+            return adjustedDate.toISOString().split('T')[0];
+        }
+
+        function toggleNote(show) {
+            const key = getDateKey(viewDate);
+            if (show) {
+                document.getElementById('note-date-title').innerText = "Notes: " + key;
+                noteTextarea.value = (trackerData[key] && trackerData[key].note) ? trackerData[key].note : "";
+                
+                // If in history mode, make it read-only
+                const isToday = key === getDateKey(new Date());
+                noteTextarea.readOnly = !isToday;
+                noteTextarea.placeholder = isToday ? "What's on your mind?" : "No notes for this day.";
+                
+                noteOverlay.style.display = 'flex';
+            } else {
+                if (!noteTextarea.readOnly) {
+                    saveNote(noteTextarea.value);
+                }
+                noteOverlay.style.display = 'none';
+            }
+        }
+
+        function saveNote(text) {
+            const key = getDateKey(viewDate);
+            if (!trackerData[key]) trackerData[key] = { hours: Array(24).fill(0), note: "" };
+            trackerData[key].note = text;
+            localStorage.setItem('discipline-data-v5', JSON.stringify(trackerData));
+        }
+
+        function calculateStreak() {
+            let streak = 0;
+            let checkDate = new Date();
+            while (true) {
+                const key = getDateKey(checkDate);
+                const dayData = trackerData[key];
+                if (dayData && dayData.hours.filter(h => h === 2).length >= 6) {
+                    streak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else { break; }
+            }
+            return streak;
+        }
+
+        function updateProgressBar() {
+            const data = trackerData[getDateKey(new Date())];
+            if (!data) return;
+            const hours = data.hours;
+            const totalScore = hours.filter(h => h === 2).length + (hours.filter(h => h === 1).length * 0.5);
+            progressBar.style.width = Math.min((totalScore / 12) * 100, 100) + "%";
+        }
+
+        function renderGrid() {
+            const todayKey = getDateKey(new Date());
+            const viewKey = getDateKey(viewDate);
+            const currentHour = new Date().getHours();
+
+            if (!trackerData[viewKey]) trackerData[viewKey] = { hours: Array(24).fill(0), note: "" };
+
+            if (isInsightsMode) {
+                titleLabel.innerText = "Insights";
+                viewLabel.innerText = viewKey === todayKey ? "Viewing: Today" : viewKey;
+                dayNav.style.display = "flex";
+                helperText.style.display = "none";
+                streakDisplay.style.display = "block";
+                themeBtn.style.display = "block";
+                streakCountText.innerText = calculateStreak();
+                document.getElementById('next-btn').style.opacity = (viewKey === todayKey) ? "0.2" : "1";
+            } else {
+                titleLabel.innerText = "Today";
+                dayNav.style.display = "none";
+                helperText.style.display = "block";
+                streakDisplay.style.display = "none";
+                themeBtn.style.display = "none";
+                updateProgressBar();
+            }
+
+            gridElement.innerHTML = '';
+            trackerData[viewKey].hours.forEach((state, index) => {
+                const box = document.createElement('div');
+                box.classList.add('hour-box');
+                box.innerText = index;
+                if (!isInsightsMode && index > currentHour) box.classList.add('future');
+                else {
+                    if (state === 1) box.classList.add('medium');
+                    if (state === 2) box.classList.add('dark');
+                    if (!isInsightsMode) setupInteractions(box, index);
+                }
+                gridElement.appendChild(box);
+            });
+        }
+
+        function setupInteractions(el, index) {
+            let timer;
+            let isLong = false;
+            el.onpointerdown = () => {
+                isLong = false;
+                timer = setTimeout(() => {
+                    isLong = true; saveData(index, 1);
+                    if(navigator.vibrate) navigator.vibrate(40);
+                }, 500);
+            };
+            el.onpointerup = () => {
+                clearTimeout(timer);
+                if (!isLong) {
+                    const key = getDateKey(viewDate);
+                    const cur = trackerData[key].hours[index];
+                    saveData(index, cur === 2 ? 0 : 2);
+                }
+            };
+        }
+
+        function saveData(index, val) {
+            const key = getDateKey(viewDate);
+            trackerData[key].hours[index] = val;
+            localStorage.setItem('discipline-data-v5', JSON.stringify(trackerData));
+            renderGrid();
+        }
+
+        function switchTab(mode) {
+            isInsightsMode = (mode === 'insights');
+            viewDate = new Date(); 
+            document.getElementById('tab-today').classList.toggle('active', !isInsightsMode);
+            document.getElementById('tab-insights').classList.toggle('active', isInsightsMode);
+            renderGrid();
+        }
+
+        function changeDay(step) {
+            const nextDate = new Date(viewDate);
+            nextDate.setDate(viewDate.getDate() + step);
+            if (nextDate > new Date()) return; 
+            viewDate = nextDate;
+            renderGrid();
+        }
+
+        setInterval(() => { if (!isInsightsMode) renderGrid(); }, 30000); 
+        renderGrid();
+    </script>
+</body>
+</html>
+
